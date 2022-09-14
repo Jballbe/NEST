@@ -1,0 +1,79 @@
+"""
+adaptive_threshold model - Leaky integrate-and-fire neuron model with conductance and current input and spike threshold adaptation
+##############################################################################
+
+Description
++++++++++++
+
+adaptive_threshold is an implementation of a spiking neuron using IAF dynamics with
+conductance and current input. The spiking threshold is linearly increasing with the spiking frequency The beta function
+is normalised such that an event of weight 1.0 results in a peak current of
+1 nS at :math:`t = \tau_{rise\_[ex|in]}`.
+
+
+References
+++++++++++
+
+.. [1] Chizhov 2014. A simple Markov model of sodium channels with a dynamic threshold. 
+       Journal of Computational Neuroscience,
+       37:181-191.
+       DOI: 10.1007/s10827-014-0496-6
+.. [2] Graham, L. J., & Schramm, A. (2009). In vivo dynamic clamp: The functional impact of synaptic and intrinsic conductances in visual cortex. 
+       In A. Destexhe, & T. Bal (Eds.) Dynamic clamp: From principles to applications. Springer.
+
+"""
+
+neuron adaptive_threshold:
+
+  state:
+    v mV = -70. mV    # Membrane potential in mV
+    #v_th mV = -60. mV    # Spike threshold in mV
+    #t_last_spike ms = 0. ms # time of last spike
+  end
+
+  function sqrt(x real) real:
+
+    return x**(1/2)
+
+  end
+  #
+  equations:
+    #kernel v_th = v_l + 10.0mV #+ 0.2 mV/s /(t-t_last_spike)
+
+    v' = (  ( -(G_l+s_input)*(v-v_l) + u_input + sqrt(2.) * sigmav * G_l * random_normal(0,1)) ) / s /nS
+    
+    #v_th' = 0.2 * (-t_last_spike*10**-3/( (t*10**-3 - t_last_spike*10**-3)**2)) *mV
+    
+  end
+
+  
+  
+  parameters:
+    C_m F = .02 F   # Membrane Capacitance (define as Tau*Gl; Tau=10ms and G_l=10nS)
+    G_l nS = 10. nS   # Membrane conductance in nS
+    v_l mV = -70. mV # Membrane resting potential in mV; After-spike reset value of v
+    sigmav mV = 2. mV   # Amplitude of Noise in mV
+    v_th mV = -60. mV
+
+  end
+
+  input:
+    u_input pA <- continuous # voltage independant current input in pA.
+    s_input nS <- continuous # voltage-independant conductance input in nS.
+  end
+
+  output: spike
+
+  update:
+    integrate_odes()
+
+    # threshold crossing
+    if v >= v_th:
+      v = v_l
+      #t_last_spike = t
+      emit_spike()
+    end
+
+  end
+
+end

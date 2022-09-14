@@ -1,0 +1,80 @@
+"""
+adaptive_threshold model - Leaky integrate-and-fire neuron model with conductance and current input and spike threshold adaptation
+##############################################################################
+
+Description
++++++++++++
+
+adaptive_threshold is an implementation of a spiking neuron using IAF dynamics with
+conductance and current input. The spiking threshold is linearly increasing with the spiking frequency The beta function
+is normalised such that an event of weight 1.0 results in a peak current of
+1 nS at :math:`t = \tau_{rise\_[ex|in]}`.
+
+s_input nS <- continuous # voltage independant conductance input in nS
+
+References
+++++++++++
+
+.. [1] Chizhov 2014. A simple Markov model of sodium channels with a dynamic threshold. 
+       Journal of Computational Neuroscience,
+       37:181-191.
+       DOI: 10.1007/s10827-014-0496-6
+.. [2] Graham, L. J., & Schramm, A. (2009). In vivo dynamic clamp: The functional impact of synaptic and intrinsic conductances in visual cortex. 
+       In A. Destexhe, & T. Bal (Eds.) Dynamic clamp: From principles to applications. Springer.
+
+"""
+
+neuron Chizhov_model:
+
+
+  state:
+    V_m mV = -70. mV    # Membrane potential in mV
+    noise pA = 0. pA    # Noise in pA
+    
+    v_th mV = -60.  mV   # Spike threshold potential in mV
+    delta_t ms = 1e99 ms  # Time since the last spike in ms; Initial value set at +inf
+    
+  end
+
+  equations:
+    
+    V_m' =  (u_input-(G_l+s_input)*(V_m-v_l)+noise)/C_m
+  end
+
+  function sqrt(x real) real:
+    return x**(1/2)
+  end
+
+  
+
+  parameters:
+    C_m F = 100. F    # Membrane Capacitance (define as Tau*Gl; Tau=10ms and G_l=10nS)
+    G_l nS = 10. nS    # Membrane conductance in nS
+    v_l mV = -70. mV    # Membrane resting potential in mV; after-spike reset value of v
+    sigma_v mV = 2. mV  # Amplitude of the noise in term of the steady state sub-threshold dispersion
+    s_input nS = 0. nS  # voltage independant conductance input in nS.
+  end
+
+  input:
+    u_input pA <- continuous # voltage independant current input in pA.
+    
+  end
+
+  output: spike
+
+  update:
+    delta_t += resolution()  # Add one time step (size=resolution of simulation) to the time since last spike
+    integrate_odes()
+    noise=sqrt(2.)*sigma_v*G_l*random_normal(0,1)
+    v_th = v_l  + 10. mV + 0.2*mV/Hz /(delta_t)  #Compute value of spike threshold based on the time since last spike (delta_t)
+    
+
+    if V_m >= v_th :   # threshold crossing
+      V_m = v_l         # reset membrane potential to resting potential
+      delta_t= 0. ms    #reset time from last spike to 0
+      emit_spike()
+    end
+
+  end
+
+end
